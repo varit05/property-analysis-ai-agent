@@ -1,0 +1,32 @@
+name: top_streets
+description: >
+  Return the top-N streets by average sale price in a UK postcode district.
+  Aggregates transaction data client-side to avoid heavy SPARQL operations.
+  Useful for identifying premium streets and price trends in a neighbourhood.
+inputs:
+  postcode_district:
+    type: string
+    description: UK postcode district (e.g., GU1, SW1A, E14)
+    required: true
+  sample:
+    type: integer
+    description: Max number of transactions to fetch before aggregation
+    default: 500
+    required: false
+  top_n:
+    type: integer
+    description: Number of top streets to return
+    default: 5
+    required: false
+output:
+  type: array
+  items:
+    type: object
+    properties:
+      street:
+        type: string
+      avg_price:
+        type: number
+      transactions:
+        type: integer
+function: server.api.properties.data_sources.top_streets

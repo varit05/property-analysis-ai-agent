@@ -1,0 +1,29 @@
+name: regional_hpi
+description: >
+  Fetch the House Price Index (HPI) for a UK region over a number of months.
+  Returns average price, annual change percentage, and monthly change percentage.
+  Useful for market analysis and understanding regional property trends.
+inputs:
+  region:
+    type: string
+    description: UK region name in lowercase (e.g., south-east, london, north-west, east-midlands)
+    required: true
+  months:
+    type: integer
+    description: Number of recent monthly records to return
+    default: 36
+    required: false
+output:
+  type: array
+  items:
+    type: object
+    properties:
+      period:
+        type: string
+      avg_price:
+        type: number
+      annual_change:
+        type: number
+      monthly_change:
+        type: number
+function: server.api.properties.data_sources.regional_hpi

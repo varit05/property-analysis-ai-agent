@@ -4,7 +4,9 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from server.api import api_router
 from server.core.config import settings
+from server.core.exceptions import register_exception_handlers
 from server.core.logging import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -29,6 +31,12 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Register exception handlers
+    register_exception_handlers(app)
+    
+    # Include API router
+    app.include_router(api_router, prefix="/api/v1")
 
     @app.get("/health", tags=["Health"])
     def root_health():

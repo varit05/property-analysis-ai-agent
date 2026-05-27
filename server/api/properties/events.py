@@ -9,7 +9,6 @@ the subscriber calls ``unsubscribe`` to clean up.
 import asyncio
 import json
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +77,7 @@ class SSEEventManager:
 
 
 # Singleton
-_event_manager: Optional[SSEEventManager] = None
+_event_manager: SSEEventManager | None = None
 
 
 def get_event_manager() -> SSEEventManager:

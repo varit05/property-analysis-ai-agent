@@ -11,34 +11,33 @@ Supports:
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
+from server.api.properties.events import get_event_manager
 from server.api.properties.schemas import (
-    ANALYSIS_STATUS_RUNNING,
-    ANALYSIS_STATUS_PENDING_REVIEW,
     ANALYSIS_STATUS_ACCEPTED,
-    ANALYSIS_STATUS_REJECTED,
     ANALYSIS_STATUS_FAILED,
+    ANALYSIS_STATUS_PENDING_REVIEW,
+    ANALYSIS_STATUS_REJECTED,
+    ANALYSIS_STATUS_RUNNING,
+    AgentOutput,
     AnalysisRequest,
     AnalysisResponse,
+    ChartDataPoint,
+    ChartSeries,
     ReviewRequest,
     ReviewResponse,
-    AgentOutput,
     TraceStep,
-    ChartSeries,
-    ChartDataPoint,
 )
-from server.api.properties.events import get_event_manager
+from server.api.properties.skills_loader import load_skills
 from server.api.properties.store import get_store
 from server.core.config import settings
-from server.core.llm_factory import get_llm
-from server.api.properties.skills_loader import load_skills
 from server.core.deep_agent import DeepAgent
 from server.core.exceptions import (
-    AgentException,
-    NotFoundException,
     ConflictException,
+    NotFoundException,
 )
+from server.core.llm_factory import get_llm
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +56,7 @@ class PropertiesService:
         """
 
         analysis_id = str(uuid.uuid4())
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Create initial record
         record = {
@@ -120,7 +119,8 @@ class PropertiesService:
             # can execute fully in parallel without blocking on a shared
             # singleton.
             logger.info(
-                "Creating DeepAgent for background analysis (env=%s, max_iterations=%d)",
+                "Creating DeepAgent for background analysis"
+                " (env=%s, max_iterations=%d)",
                 settings.ENVIRONMENT,
                 settings.MAX_AGENT_ITERATIONS,
             )
@@ -172,7 +172,7 @@ class PropertiesService:
                 {
                     "status": ANALYSIS_STATUS_PENDING_REVIEW,
                     "result": agent_output.model_dump(),
-                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                    "completed_at": datetime.now(UTC).isoformat(),
                 },
             )
 
@@ -200,7 +200,7 @@ class PropertiesService:
                 {
                     "status": ANALYSIS_STATUS_FAILED,
                     "error": str(e),
-                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                    "completed_at": datetime.now(UTC).isoformat(),
                 },
             )
             events.publish(
@@ -255,13 +255,13 @@ class PropertiesService:
             analysis_id,
             {
                 "status": new_status,
-                "reviewed_at": datetime.now(timezone.utc).isoformat(),
+                "reviewed_at": datetime.now(UTC).isoformat(),
             },
         )
 
         # Update local record for response
         record["status"] = new_status
-        record["reviewed_at"] = datetime.now(timezone.utc)
+        record["reviewed_at"] = datetime.now(UTC)
 
         message = (
             f"Analysis {analysis_id} has been accepted."

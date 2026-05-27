@@ -25,6 +25,39 @@ dependencies = [
     "uvicorn>=0.48.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.11.0",
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["server", "server.*"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py314"
+extend-exclude = [
+    ".venv",
+    "venv",
+    "env",
+    "__pycache__",
+    ".eggs",
+    "dist",
+    "build",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "SIM", "ARG", "PT", "S"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/**" = ["S101"]
+"api/properties/prompts/*.py" = ["E501"]
+"core/config.py" = ["S104"]
+"core/exceptions.py" = ["N818", "ARG001"]

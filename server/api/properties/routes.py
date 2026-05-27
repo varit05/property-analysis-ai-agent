@@ -1,11 +1,11 @@
 import asyncio
 import json
 import logging
-from typing import Optional
 
-from fastapi import APIRouter, Query, Request, status
+from fastapi import APIRouter, status
 from fastapi.responses import StreamingResponse
 
+from server.api.properties.events import get_event_manager
 from server.api.properties.schemas import (
     AnalysisRequest,
     AnalysisResponse,
@@ -13,7 +13,6 @@ from server.api.properties.schemas import (
     ReviewResponse,
 )
 from server.api.properties.service import PropertiesService
-from server.api.properties.events import get_event_manager
 from server.api.properties.store import get_store
 
 logger = logging.getLogger(__name__)
@@ -34,7 +33,7 @@ async def trigger_analysis(request: AnalysisRequest):
 
 
 @router.get("/analyses/{analysis_id}/stream")
-async def stream_analysis(analysis_id: str, request: Request):
+async def stream_analysis(analysis_id: str):
     """SSE endpoint that streams trace step progress for an analysis.
 
     On connect, replays any existing trace steps. Then streams new
@@ -69,10 +68,12 @@ async def stream_analysis(analysis_id: str, request: Request):
             for step in existing_steps:
                 yield f"event: trace_step\ndata: {json.dumps(step)}\n\n"
 
-            TERMINAL_STATUSES = {"pending_review", "accepted", "rejected", "failed"}
+            terminal_statuses = {"pending_review", "accepted", "rejected", "failed"}
             # If already terminal, send status and stop
-            if record.get("status") in TERMINAL_STATUSES:
-                yield f"event: status_change\ndata: {json.dumps({'status': record['status']})}\n\n"
+            current_status = record.get("status")
+            if current_status in terminal_statuses:
+                status_data = json.dumps({"status": current_status})
+                yield f"event: status_change\ndata: {status_data}\n\n"
                 return
 
             # Stream live events from the queue
@@ -86,9 +87,9 @@ async def stream_analysis(analysis_id: str, request: Request):
 
                     # Check if terminal — re-read from store to get latest status
                     current = await store.get(analysis_id)
-                    if current and current.get("status") in TERMINAL_STATUSES:
+                    if current and current.get("status") in terminal_statuses:
                         break
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Send keep-alive comment to prevent connection timeout
                     yield ": keepalive\n\n"
 

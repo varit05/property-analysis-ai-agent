@@ -34,7 +34,7 @@ def create_app() -> FastAPI:
 
     # Register exception handlers
     register_exception_handlers(app)
-    
+
     # Include API router
     app.include_router(api_router, prefix="/api/v1")
 

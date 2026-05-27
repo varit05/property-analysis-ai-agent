@@ -12,10 +12,10 @@ Two endpoints are available, no authentication required:
      Returns monthly regional index records (avg price, annual/monthly change).
 """
 
-import httpx
-from datetime import date, timedelta
 from collections import defaultdict
-from typing import Optional
+from datetime import date, timedelta
+
+import httpx
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -44,9 +44,7 @@ async def sparql_query(query: str, timeout: int = 60) -> dict:
         return resp.json()
 
 
-async def hpi_get(
-    region: str, params: Optional[dict] = None, timeout: int = 20
-) -> dict:
+async def hpi_get(region: str, params: dict | None = None, timeout: int = 20) -> dict:
     """Fetch HPI data from the Land Registry REST endpoint."""
     url = f"{HPI_BASE}/{region}.json"
     headers = {"Accept": "application/json", "User-Agent": "lr-example/1.0"}

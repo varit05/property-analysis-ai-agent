@@ -8,7 +8,6 @@ initialises the file with an empty list on first access.
 import json
 import logging
 from pathlib import Path
-from typing import Optional
 
 from server.core.config import settings
 
@@ -18,7 +17,7 @@ logger = logging.getLogger(__name__)
 class AnalysisStore:
     """Persistent, async-safe storage for analysis records backed by a JSON file."""
 
-    def __init__(self, file_path: Optional[str] = None):
+    def __init__(self, file_path: str | None = None):
         self._file_path = Path(file_path or settings.ANALYSES_FILE)
         self._lock = None  # asyncio.Lock — lazy initialised
         self._ensure_file()
@@ -64,7 +63,7 @@ class AnalysisStore:
     # Public API
     # ------------------------------------------------------------------
 
-    async def get(self, analysis_id: str) -> Optional[dict]:
+    async def get(self, analysis_id: str) -> dict | None:
         """Get a single analysis record by ID, or None if not found."""
         lock = await self._get_lock()
         async with lock:
@@ -98,7 +97,7 @@ class AnalysisStore:
 
     async def list(
         self,
-        query_filter: Optional[str] = None,
+        query_filter: str | None = None,
         skip: int = 0,
         limit: int = 100,
     ) -> tuple[list[dict], int]:
@@ -131,7 +130,7 @@ class AnalysisStore:
 
 
 # Singleton store instance (lazy-initialised by the service)
-_store: Optional[AnalysisStore] = None
+_store: AnalysisStore | None = None
 
 
 async def get_store() -> AnalysisStore:

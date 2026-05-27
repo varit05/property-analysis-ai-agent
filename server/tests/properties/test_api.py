@@ -6,14 +6,15 @@ POST /analyze endpoint returns immediately with status "running".
 Background execution is mocked to avoid side effects.
 """
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
 from server.api.properties.schemas import (
-    ANALYSIS_STATUS_RUNNING,
-    ANALYSIS_STATUS_PENDING_REVIEW,
     ANALYSIS_STATUS_ACCEPTED,
+    ANALYSIS_STATUS_PENDING_REVIEW,
     ANALYSIS_STATUS_REJECTED,
+    ANALYSIS_STATUS_RUNNING,
 )
 
 # Module-level in-memory store dict shared between the mock and tests
@@ -56,21 +57,23 @@ def mock_deps():
     _in_memory_store.clear()
     mock_store = _MockStore()
 
-    with patch("server.api.properties.service.get_store", return_value=mock_store):
-        with patch("server.api.properties.routes.get_store", return_value=mock_store):
-            # Mock DeepAgent directly instead of the removed _get_agent —
-            # each background task now creates a fresh DeepAgent instance.
-            with patch("server.api.properties.service.DeepAgent") as mock_agent_cls:
-                # Default mock agent that does nothing — tests override as needed
-                mock_agent_instance = AsyncMock()
-                mock_agent_instance.run.return_value = {
-                    "research_note": "",
-                    "charts": [],
-                    "trace": [],
-                    "iterations": 1,
-                }
-                mock_agent_cls.return_value = mock_agent_instance
-                yield
+    with (
+        patch("server.api.properties.service.get_store", return_value=mock_store),
+        patch("server.api.properties.routes.get_store", return_value=mock_store),
+        patch("server.api.properties.service.DeepAgent") as mock_agent_cls,
+    ):
+        # Mock DeepAgent directly instead of the removed _get_agent —
+        # each background task now creates a fresh DeepAgent instance.
+        # Default mock agent that does nothing — tests override as needed
+        mock_agent_instance = AsyncMock()
+        mock_agent_instance.run.return_value = {
+            "research_note": "",
+            "charts": [],
+            "trace": [],
+            "iterations": 1,
+        }
+        mock_agent_cls.return_value = mock_agent_instance
+        yield
 
 
 class TestPropertiesAPI:
@@ -278,7 +281,8 @@ class TestPropertiesAPI:
             {
                 "id": "stream-replay-test",
                 "query": "test",
-                "status": ANALYSIS_STATUS_PENDING_REVIEW,  # terminal status — stream ends
+                "status": ANALYSIS_STATUS_PENDING_REVIEW,
+                # terminal status — stream ends
                 "result": None,
                 "error": None,
                 "trace_steps": [

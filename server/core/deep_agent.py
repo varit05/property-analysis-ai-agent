@@ -1,9 +1,12 @@
 """
-DeepAgent — LangChain/LangGraph-based planning, orchestration, and re-evaluation agent.
+DeepAgent — LangChain/LangGraph-based planning, orchestration, and re-evaluation
+agent.
 
 Architecture:
-  1. PLANNING: LLM reviews the user's natural language query + available YAML skills → creates step-by-step plan
-  2. EXECUTION: Executes each plan step by calling the corresponding skill function
+  1. PLANNING: LLM reviews the user's natural language query + available YAML
+     skills → creates step-by-step plan
+  2. EXECUTION: Executes each plan step by calling the corresponding skill
+     function
   3. RE-EVALUATION: LLM reviews all collected results against the original query
      - If sufficient: return final analysis + chart data
      - If not & under max_iterations: re-plan with accumulated context
@@ -18,24 +21,18 @@ Output:
 import asyncio
 import logging
 import time
-from typing import Any, Optional
+from typing import Any
 
 import yaml
 
+from server.api.properties.prompts.evaluate_prompt import EVALUATE_PROMPT_PATH
+from server.api.properties.prompts.plan_prompt import PLAN_PROMPT_PATH
+from server.api.properties.prompts.synthesis_prompt import SYNTHESIS_PROMPT_PATH
+from server.api.properties.skills_loader import Skill, load_skills
 from server.core.config import settings
 from server.core.llm_factory import get_llm
-from server.api.properties.skills_loader import Skill, load_skills
 
 logger = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# Prompt templates
-# ---------------------------------------------------------------------------
-
-from server.api.properties.prompts.plan_prompt import PLAN_PROMPT_PATH
-from server.api.properties.prompts.evaluate_prompt import EVALUATE_PROMPT_PATH
-from server.api.properties.prompts.synthesis_prompt import SYNTHESIS_PROMPT_PATH
 
 
 def _build_skills_description(skills: dict[str, Skill]) -> str:
@@ -43,7 +40,10 @@ def _build_skills_description(skills: dict[str, Skill]) -> str:
     parts = []
     for skill in skills.values():
         inputs_desc = ", ".join(
-            f"{name}: {info.get('type', 'unknown')} ({'required' if info.get('required', True) else 'optional'})"
+            (
+                f"{name}: {info.get('type', 'unknown')}"
+                f" ({'required' if info.get('required', True) else 'optional'})"
+            )
             for name, info in skill.inputs.items()
         )
         parts.append(f"- {skill.name}: {skill.description}\n  Inputs: {inputs_desc}")
@@ -66,9 +66,9 @@ def _summarise_result(skill_name: str, result: Any) -> str:
             val = result[key]
             if isinstance(val, list):
                 summary_parts.append(f"{key}: {len(val)} items")
-            elif isinstance(val, (int, float)):
-                summary_parts.append(f"{key}: {val}")
-            elif isinstance(val, str) and len(val) < 100:
+            elif (
+                isinstance(val, (int, float)) or isinstance(val, str) and len(val) < 100
+            ):
                 summary_parts.append(f"{key}: {val}")
         if summary_parts:
             return "; ".join(summary_parts)
@@ -86,9 +86,9 @@ class DeepAgent:
 
     def __init__(
         self,
-        skills: Optional[dict[str, Skill]] = None,
+        skills: dict[str, Skill] | None = None,
         llm=None,
-        max_iterations: Optional[int] = None,
+        max_iterations: int | None = None,
     ):
         self.skills = skills or load_skills()
         self.llm = llm or get_llm()
@@ -97,10 +97,10 @@ class DeepAgent:
     async def run(
         self,
         query: str,
-        additional_context: Optional[str] = None,
-        on_trace_step: Optional[callable] = None,
+        additional_context: str | None = None,
+        on_trace_step: callable | None = None,
     ) -> dict:
-        """Run the full DeepAgent loop: plan → execute → evaluate (up to max_iterations).
+        """Run the full DeepAgent loop: plan → execute → evaluate.
 
         Args:
             query: The user's natural language analysis request.
@@ -157,7 +157,10 @@ class DeepAgent:
             await _emit_step(
                 {
                     "step_number": len(trace_steps) + 1,
-                    "action": f"Checked if the results so far are sufficient. Decision: {reason}",
+                    "action": (
+                        "Checked if the results so far are sufficient."
+                        f" Decision: {reason}"
+                    ),
                     "skill_used": "evaluation",
                     "input": {},
                     "output_summary": reason,
@@ -201,7 +204,10 @@ class DeepAgent:
                 await _emit_step(
                     {
                         "step_number": len(trace_steps) + 1,
-                        "action": f"Re-checked if the results are sufficient. Decision: {reason}",
+                        "action": (
+                            "Re-checked if the results are sufficient."
+                            f" Decision: {reason}"
+                        ),
                         "skill_used": "evaluation",
                         "input": {},
                         "output_summary": reason,
@@ -210,7 +216,7 @@ class DeepAgent:
                     }
                 )
 
-            # If still not sufficient after max iterations, synthesize from collected data
+            # If still not sufficient, synthesize from collected data
             if not final_analysis:
                 logger.info("Max iterations reached — synthesising from collected data")
                 synthesis_result = await self._synthesize(query, context, all_results)
@@ -244,7 +250,7 @@ class DeepAgent:
         self,
         plan: list[dict],
         existing_traces: list[dict],
-        emit_step: Optional[callable] = None,
+        emit_step: callable | None = None,
     ) -> tuple[list[dict], list[dict]]:
         """Step 2: Execute each element in the plan by calling skill functions.
 
@@ -334,7 +340,10 @@ class DeepAgent:
                     or f"Tried to call skill '{skill_name}' but it was not found",
                     "skill_used": skill_name,
                     "input": params,
-                    "output_summary": f"Skill '{skill_name}' is not available. Cannot proceed with this step.",
+                    "output_summary": (
+                        f"Skill '{skill_name}' is not available."
+                        " Cannot proceed with this step."
+                    ),
                     "status": "error",
                     "duration_seconds": round(elapsed, 2),
                 }

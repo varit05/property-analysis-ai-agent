@@ -13,7 +13,7 @@ import importlib
 import inspect
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import yaml
 
@@ -66,7 +66,7 @@ class Skill:
         }
 
 
-def load_skills(skills_dir: Optional[str] = None) -> dict[str, Skill]:
+def load_skills(skills_dir: str | None = None) -> dict[str, Skill]:
     """Load all YAML skill files from the skills directory.
 
     Returns a dict mapping skill name → Skill instance.

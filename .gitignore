@@ -29,6 +29,7 @@ env/
 # Logs
 *.log
 logs/
+server/data/analyses.json
 
 # Docker
 .docker/

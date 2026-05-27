@@ -1,0 +1,31 @@
+name: price_paid_transactions
+description: >
+  Fetch recent property transaction records for a given UK postcode district.
+  Returns a list of transactions with price, date, street, postcode, and property type.
+  Useful for property valuation by finding comparable sales in the same area.
+inputs:
+  postcode_district:
+    type: string
+    description: UK postcode district (e.g., GU1, SW1A, E14)
+    required: true
+  limit:
+    type: integer
+    description: Max number of transaction records to return
+    default: 10
+    required: false
+output:
+  type: array
+  items:
+    type: object
+    properties:
+      price:
+        type: integer
+      date:
+        type: string
+      street:
+        type: string
+      postcode:
+        type: string
+      propertyType:
+        type: string
+function: server.api.properties.data_sources.price_paid_transactions

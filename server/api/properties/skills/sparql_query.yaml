@@ -1,0 +1,20 @@
+name: sparql_query
+description: >
+  Execute an arbitrary SPARQL query against the UK Land Registry public endpoint.
+  Use this for custom property data queries not covered by other skills.
+  The endpoint returns data in standard SPARQL JSON results format.
+  Note: Avoid heavy GROUP BY / ORDER BY as the endpoint may return 503 under load.
+inputs:
+  query:
+    type: string
+    description: The full SPARQL query string
+    required: true
+  timeout:
+    type: integer
+    description: Query timeout in seconds
+    default: 60
+    required: false
+output:
+  type: object
+  description: SPARQL JSON results with bindings
+function: server.api.properties.data_sources.sparql_query

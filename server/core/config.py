@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     SKILLS_DIR: str = "server/properties/skills"
     MAX_AGENT_ITERATIONS: int = 3
 
+    # FastAPI server URL (used by MCP client to connect to this server)
+    FASTAPI_URL: str = "http://localhost:8000"
+
     # Storage
     ANALYSES_FILE: str = "server/data/analyses.json"
 

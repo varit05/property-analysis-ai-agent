@@ -63,10 +63,18 @@ app = create_app()
 
 
 if __name__ == "__main__":
-    uvicorn.run(
-        "server.main:app",
-        host=settings.HOST,
-        port=settings.PORT,
-        reload=settings.DEBUG,
-        log_level=settings.LOG_LEVEL.lower(),
-    )
+    import sys
+
+    # Allow launching the MCP server via `python -m server.main --mcp`
+    if "--mcp" in sys.argv:
+        from server.mcp_server.server import main as mcp_main
+
+        mcp_main()
+    else:
+        uvicorn.run(
+            "server.main:app",
+            host=settings.HOST,
+            port=settings.PORT,
+            reload=settings.DEBUG,
+            log_level=settings.LOG_LEVEL.lower(),
+        )

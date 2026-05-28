@@ -27,6 +27,7 @@ from server.api.properties.schemas import (
     ChartSeries,
     ReviewRequest,
     ReviewResponse,
+    TokenUsage,
     TraceStep,
 )
 from server.api.properties.skills_loader import load_skills
@@ -134,6 +135,7 @@ class PropertiesService:
             )
 
             # Build structured output
+            token_usage_data = agent_result.get("token_usage")
             agent_output = AgentOutput(
                 research_note=agent_result.get("research_note", ""),
                 charts=[
@@ -164,6 +166,9 @@ class PropertiesService:
                     )
                     for t in agent_result.get("trace", [])
                 ],
+                token_usage=(
+                    TokenUsage(**token_usage_data) if token_usage_data else None
+                ),
             )
 
             # Update record to pending_review

@@ -113,6 +113,7 @@ class DeepAgent:
           - charts: list[dict] — chart-ready data series
           - trace: list[dict] — step-by-step log for non-technical readers
           - iterations: int — number of iterations completed
+          - token_usage: dict — aggregated token counts across all LLM calls
         """
         skills_desc = _build_skills_description(self.skills)
         context = additional_context or "No additional context provided."
@@ -123,6 +124,9 @@ class DeepAgent:
         iteration = 0
         final_analysis = None
         final_charts = []
+
+        # Accumulate token usage across all LLM calls
+        token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
         async def _emit_step(step: dict) -> None:
             """Append a trace step and notify the external callback.
@@ -137,14 +141,22 @@ class DeepAgent:
                 await on_trace_step(step)
 
         # --- ITERATION 1: Initial planning + execution ---
-        plan = await self._plan(skills_desc, query, context)
+        plan, plan_tokens = await self._plan(skills_desc, query, context)
+        token_usage["prompt_tokens"] += plan_tokens.get("prompt_tokens", 0)
+        token_usage["completion_tokens"] += plan_tokens.get("completion_tokens", 0)
+        token_usage["total_tokens"] += plan_tokens.get("total_tokens", 0)
         logger.info("Iteration 1: Plan produced with %d steps", len(plan))
 
         iteration_results, _ = await self._execute_plan(plan, trace_steps, _emit_step)
         all_results.extend(iteration_results)
 
         # Re-evaluate
-        eval_result = await self._evaluate(skills_desc, query, context, all_results)
+        eval_result, eval_tokens = await self._evaluate(
+            skills_desc, query, context, all_results
+        )
+        token_usage["prompt_tokens"] += eval_tokens.get("prompt_tokens", 0)
+        token_usage["completion_tokens"] += eval_tokens.get("completion_tokens", 0)
+        token_usage["total_tokens"] += eval_tokens.get("total_tokens", 0)
         iteration += 1
 
         if eval_result.get("sufficient"):
@@ -189,9 +201,12 @@ class DeepAgent:
                 )
                 all_results.extend(iteration_results)
 
-                eval_result = await self._evaluate(
+                eval_result, eval_tokens = await self._evaluate(
                     skills_desc, query, context, all_results
                 )
+                token_usage["prompt_tokens"] += eval_tokens.get("prompt_tokens", 0)
+                token_usage["completion_tokens"] += eval_tokens.get("completion_tokens", 0)
+                token_usage["total_tokens"] += eval_tokens.get("total_tokens", 0)
                 iteration += 1
 
                 if eval_result.get("sufficient"):
@@ -219,7 +234,12 @@ class DeepAgent:
             # If still not sufficient, synthesize from collected data
             if not final_analysis:
                 logger.info("Max iterations reached — synthesising from collected data")
-                synthesis_result = await self._synthesize(query, context, all_results)
+                synthesis_result, synth_tokens = await self._synthesize(
+                    query, context, all_results
+                )
+                token_usage["prompt_tokens"] += synth_tokens.get("prompt_tokens", 0)
+                token_usage["completion_tokens"] += synth_tokens.get("completion_tokens", 0)
+                token_usage["total_tokens"] += synth_tokens.get("total_tokens", 0)
                 final_analysis = synthesis_result.get("analysis", str(all_results))
                 final_charts = synthesis_result.get("charts", [])
 
@@ -228,6 +248,7 @@ class DeepAgent:
             "charts": final_charts,
             "trace": trace_steps,
             "iterations": iteration,
+            "token_usage": token_usage,
         }
 
     async def _plan(
@@ -235,8 +256,11 @@ class DeepAgent:
         skills_desc: str,
         query: str,
         additional_context: str,
-    ) -> list[dict]:
-        """Step 1: LLM creates a plan using available skills."""
+    ) -> tuple[list[dict], dict]:
+        """Step 1: LLM creates a plan using available skills.
+
+        Returns (plan_steps, token_usage_dict).
+        """
         prompt = PLAN_PROMPT_PATH.format(
             skills_description=skills_desc,
             query=query,
@@ -244,7 +268,9 @@ class DeepAgent:
         )
         response = await self.llm.ainvoke(prompt)
         content = response.content if hasattr(response, "content") else str(response)
-        return self._parse_json_list(content)
+        plan = self._parse_json_list(content)
+        tokens = self._extract_token_usage(response)
+        return plan, tokens
 
     async def _execute_plan(
         self,
@@ -402,8 +428,11 @@ class DeepAgent:
         query: str,
         additional_context: str,
         all_results: list[dict],
-    ) -> dict:
-        """Step 3: LLM evaluates whether results are sufficient."""
+    ) -> tuple[dict, dict]:
+        """Step 3: LLM evaluates whether results are sufficient.
+
+        Returns (evaluation_result_dict, token_usage_dict).
+        """
         execution_results_str = yaml.dump(all_results, default_flow_style=False)
         prompt = EVALUATE_PROMPT_PATH.format(
             skills_description=skills_desc,
@@ -413,15 +442,20 @@ class DeepAgent:
         )
         response = await self.llm.ainvoke(prompt)
         content = response.content if hasattr(response, "content") else str(response)
-        return self._parse_json_obj(content)
+        result = self._parse_json_obj(content)
+        tokens = self._extract_token_usage(response)
+        return result, tokens
 
     async def _synthesize(
         self,
         query: str,
         additional_context: str,
         all_results: list[dict],
-    ) -> dict:
-        """Final synthesis when max iterations reached without sufficient evaluation."""
+    ) -> tuple[dict, dict]:
+        """Final synthesis when max iterations reached without sufficient evaluation.
+
+        Returns (synthesis_result_dict, token_usage_dict).
+        """
         execution_results_str = yaml.dump(all_results, default_flow_style=False)
         prompt = SYNTHESIS_PROMPT_PATH.format(
             query=query,
@@ -430,7 +464,58 @@ class DeepAgent:
         )
         response = await self.llm.ainvoke(prompt)
         content = response.content if hasattr(response, "content") else str(response)
-        return self._parse_json_obj(content)
+        result = self._parse_json_obj(content)
+        tokens = self._extract_token_usage(response)
+        return result, tokens
+
+    @staticmethod
+    def _extract_token_usage(response) -> dict:
+        """Extract token usage from an LLM response, handling various providers.
+
+        Checks in order:
+          1. ``usage_metadata`` — standardised LangChain attribute on AIMessage
+          2. ``response_metadata['token_usage']`` — OpenAI-provider format
+          3. ``response_metadata['usage']`` — Anthropic-provider format
+
+        Returns a dict with keys ``prompt_tokens``, ``completion_tokens``,
+        ``total_tokens`` (defaults to 0 for each if no data is available).
+        """
+        # LangChain's standardised usage_metadata attribute
+        usage = getattr(response, "usage_metadata", None)
+        if usage and isinstance(usage, dict):
+            return {
+                "prompt_tokens": usage.get("input_tokens", 0),
+                "completion_tokens": usage.get("output_tokens", 0),
+                "total_tokens": usage.get("total_tokens", 0),
+            }
+
+        # Fallback: provider-specific response_metadata
+        meta = getattr(response, "response_metadata", None) or {}
+
+        # OpenAI format: meta["token_usage"]
+        token_usage = meta.get("token_usage")
+        if token_usage and isinstance(token_usage, dict):
+            prompt = token_usage.get("prompt_tokens", 0)
+            completion = token_usage.get("completion_tokens", 0)
+            return {
+                "prompt_tokens": prompt,
+                "completion_tokens": completion,
+                "total_tokens": prompt + completion,
+            }
+
+        # Anthropic format: meta["usage"]
+        usage = meta.get("usage")
+        if usage and isinstance(usage, dict):
+            prompt = usage.get("input_tokens", 0)
+            completion = usage.get("output_tokens", 0)
+            return {
+                "prompt_tokens": prompt,
+                "completion_tokens": completion,
+                "total_tokens": prompt + completion,
+            }
+
+        # No token data available (e.g. local Ollama models)
+        return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
     # -----------------------------------------------------------------------
     # Helpers

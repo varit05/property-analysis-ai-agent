@@ -13,6 +13,14 @@ class AnalysisRequest(BaseModel):
     )
 
 
+class TokenUsage(BaseModel):
+    """Aggregated token consumption across all LLM calls made by the agent."""
+
+    prompt_tokens: int = Field(0, description="Total input / prompt tokens sent")
+    completion_tokens: int = Field(0, description="Total output / completion tokens received")
+    total_tokens: int = Field(0, description="Sum of prompt + completion tokens")
+
+
 class AgentOutput(BaseModel):
     """The structured result produced by the agent."""
 
@@ -24,6 +32,9 @@ class AgentOutput(BaseModel):
     )
     trace: list[TraceStep] = Field(
         default_factory=list, description="Step-by-step log of what the agent did"
+    )
+    token_usage: TokenUsage | None = Field(
+        None, description="Aggregated token usage across all LLM calls"
     )
 
 

@@ -10,10 +10,10 @@ Users submit a free-form natural language query (e.g. _"Analyse property price t
 
 ```bash
 # Install dependencies
-pip install server/.
+cd server && uv sync
 
-# Run the server
-uvicorn server.main:app --reload
+# Run the server (with PYTHONPATH for editable-installed package)
+PYTHONPATH=$(pwd)/.. uv run python -m server.main
 ```
 
 ### Linting & Formatting
@@ -76,12 +76,79 @@ black server/
 black --check server/
 ```
 
+## MCP Server (AI-Assistant Interface)
+
+The project includes an **MCP (Model Context Protocol) server** that exposes the property analysis backend as tools for AI assistants like Cline.
+
+```
+AI Assistant (Cline)
+    ↕ MCP (stdio transport)
+property-analysis MCP server  ──HTTP──►  FastAPI (/api/v1/properties/*)
+    ├─ trigger_analysis()
+    ├─ get_analysis()
+    └─ review_analysis()
+```
+
+### Available Tools
+
+| Tool | Description |
+|---|---|
+| `trigger_analysis(query, additional_context?)` | Submit a natural-language property analysis request. Returns immediately with an `analysis_id` and `status: "running"`. Poll with `get_analysis` for completion. |
+| `get_analysis(analysis_id)` | Retrieve the analysis result by UUID. The response includes the current `status` (`running`, `pending_review`, `accepted`, `rejected`, or `failed`) and, once complete, the `result` containing the research note and chart data. |
+| `review_analysis(analysis_id, action, reason?)` | Accept or reject a completed analysis. `action` must be `"accept"` or `"reject"`. Requires the analysis to be in `pending_review` status. |
+
+### Architecture
+
+The MCP server is a lightweight Python process that communicates with the FastAPI backend over HTTP. It uses **stdio transport** — the AI assistant spawns the script as a subprocess and communicates over stdin/stdout.
+
+```
+server/
+├── main.py                      # FastAPI entry point (uvicorn + --mcp flag)
+├── core/
+│   └── config.py                # FASTAPI_URL setting (env-configurable)
+└── mcp_server/
+    ├── __init__.py
+    └── server.py                # FastMCP server (3 tools, httpx client)
+```
+
+### Running
+
+The MCP server is registered in `cline_mcp_settings.json` and auto-started by Cline. To run manually:
+
+```bash
+# Start the FastAPI server first (required)
+cd server && PYTHONPATH=$(pwd)/.. uv run python -m server.main
+
+# In another terminal, start the MCP server
+cd server && PYTHONPATH=$(pwd)/.. uv run python -m server.mcp_server.server
+```
+
+Alternatively, use the `--mcp` flag on the main entry point:
+
+```bash
+cd server && PYTHONPATH=$(pwd)/.. uv run python -m server.main --mcp
+```
+
+### Configuration
+
+The FastAPI base URL is configurable via the `FASTAPI_URL` setting in `server/core/config.py` (or the `.env` file):
+
+```env
+# .env — overrides the default for development or production
+FASTAPI_URL=http://localhost:8000
+```
+
+- **Default:** `http://localhost:8000` (local development)
+- **Production:** Set `FASTAPI_URL=https://api.yourdomain.com` in `.env`
+
+The MCP uses `PYTHONPATH` environment variable to resolve the editable-installed `server` package. This is configured in `cline_mcp_settings.json` under the `property-analysis` entry.
+
 ## Architecture Decisions
 
 ### 1. LLM-provider-agnostic
 
-    - **Development:** uses Ollama to develop and test the changes to cut down the cost.
-    - Productions' first preference is OPENAI while fallback is set to Anthropic. It can be easily switchable.
+- **Development:** Uses Ollama to develop and test the changes to cut down the cost.
+- **Productions** - Uses OPENAI primary, fallback is set to Anthropic. Easily switchable.
 
 ## 2. Core Components
 
@@ -140,7 +207,28 @@ The "brain" of the system, implementing a **Plan-Act-Evaluate** loop.
   - **Pros:** Predictability & Control is High; Can inspect, modify, or block the plan before any action is taken. Perfect for human-in-the-loop validation.
   - **Cons:** High Initial Latency. Significant upfront delay while the plan is generated, but actual execution is often faster and can sometimes be parallelized.
 
-### 3.5 File-Based JSON Storage vs. Relational Database (PostgreSQL)
+### 3.5 Async streaming vs. Wait for full response
+
+- **Choice:** Async streaming.
+- **Trade-off:**
+  - **Pros:** Excellent UX; Users see each agent step as it happens (skill execution, LLM evaluation decisions, errors) rather than waiting for a single opaque response.
+  - **Cons:** Infrastructure complexity. Requires an in-memory pub/sub event manager (`SSEEventManager`) with per-analysis subscriber queues
+
+### 3.6 SSE vs Polling vs WebSocket
+
+- **Choice:** Server Sent Events(SSE).
+- **Trade-off:**
+  - **Pros:** Real-time UX; streams trace step updates in real-time as the agent executes each step. The client receives events progressively.
+  - **Cons:** Comparatively complex implementation.
+
+### 3.7 YAML vs Markdown skills
+
+- **Choice:** YAML skills.
+- **Trade-off:**
+  - **Pros:** Routing, metadata parsing, constraints, strictly structured templates.
+  - **Cons:** Less flexible. Syntax Strictness is High. A single misplaced indentation space breaks the agent's startup.
+
+### 3.8 File-Based JSON Storage vs. Relational Database (PostgreSQL)
 
 - **Choice:** File-based JSON (`analyses.json`).
 - **Trade-off:**

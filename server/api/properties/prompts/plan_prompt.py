@@ -11,7 +11,7 @@ Additional context: {additional_context}
 
 Your task is to create a step-by-step plan. Read the user's request carefully and decide:
 - What property, area, or subject is being analysed (e.g. a postcode district like GU1, a region like "south-east", a specific property address)
-- Which of the available skills are needed to fulfil the request
+- Which of the available skills are needed to fulfill the request
 - What input parameters each skill call needs — derive these from the query text
 
 For each step, specify:

@@ -13,7 +13,7 @@ import importlib
 import inspect
 import logging
 from pathlib import Path
-from typing import Any
+from types import FunctionType
 
 import yaml
 
@@ -49,7 +49,7 @@ class Skill:
         self._fn = getattr(module, func_name)
         return self._fn
 
-    async def call(self, **kwargs) -> Any:
+    async def call(self, **kwargs) -> FunctionType:
         """Call the skill function with the given arguments."""
         fn = self.get_function()
         if inspect.iscoroutinefunction(fn):

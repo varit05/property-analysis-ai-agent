@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     ANTHROPIC_MODEL: str = "claude-sonnet-4-20250514"
 
     # DeepAgent settings
-    SKILLS_DIR: str = "server/properties/skills"
+    SKILLS_DIR: str = "server/api/properties/skills"
     MAX_AGENT_ITERATIONS: int = 3
 
     # FastAPI server URL (used by MCP client to connect to this server)
@@ -39,6 +39,11 @@ class Settings(BaseSettings):
 
     # Storage
     ANALYSES_FILE: str = "server/data/analyses.json"
+
+    # LLM Cache settings
+    LLM_CACHE_ENABLED: bool = True
+    LLM_CACHE_TTL: int = 3600  # seconds (default 1 hour)
+    REDIS_URL: str = "redis://localhost:6379/"
 
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
 

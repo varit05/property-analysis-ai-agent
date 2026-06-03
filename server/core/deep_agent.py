@@ -16,7 +16,15 @@ Output:
   - research_note: the written analysis
   - charts: structured data for rendering charts
   - trace: step-by-step log designed for a non-technical reader
+
+Prompt Caching:
+  When Anthropic is the active LLM (production fallback), system messages are
+  structured with ``cache_control`` breakpoints to enable API-level prompt
+  caching of static content (prompt templates, skills descriptions) across
+  requests — reducing both latency and cost.
 """
+
+from __future__ import annotations
 
 import asyncio
 import logging
@@ -24,13 +32,14 @@ import time
 from typing import Any
 
 import yaml
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from server.api.properties.prompts.evaluate_prompt import EVALUATE_PROMPT_PATH
 from server.api.properties.prompts.plan_prompt import PLAN_PROMPT_PATH
 from server.api.properties.prompts.synthesis_prompt import SYNTHESIS_PROMPT_PATH
 from server.api.properties.skills_loader import Skill, load_skills
 from server.core.config import settings
-from server.core.llm_factory import get_llm
+from server.core.llm_factory import get_llm, is_anthropic_available
 
 logger = logging.getLogger(__name__)
 
@@ -66,14 +75,71 @@ def _summarise_result(skill_name: str, result: Any) -> str:
             val = result[key]
             if isinstance(val, list):
                 summary_parts.append(f"{key}: {len(val)} items")
-            elif (
-                isinstance(val, (int, float)) or isinstance(val, str) and len(val) < 100
+            elif isinstance(val, (int, float)) or (
+                isinstance(val, str) and len(val) < 100
             ):
                 summary_parts.append(f"{key}: {val}")
         if summary_parts:
             return "; ".join(summary_parts)
         return f"Returned data with keys: {', '.join(keys[:5])}"
     return str(result)[:200]
+
+
+# ---------------------------------------------------------------------------
+# Anthropic prompt caching helpers
+# ---------------------------------------------------------------------------
+
+_USE_ANTHROPIC_CACHE = is_anthropic_available()
+
+
+def _build_system_message_with_cache(
+    static_blocks: list[str],
+    cache_after_last: bool = True,
+) -> SystemMessage:
+    """Build a ``SystemMessage`` with ``cache_control`` breakpoints for Anthropic.
+
+    Each string in *static_blocks* becomes a separate ``{"type": "text",
+    "text": ...}`` content block. When *cache_after_last* is ``True`` (the
+    default), the final block receives ``{"cache_control": {"type":
+    "ephemeral"}}``, telling the Anthropic API to cache up to that point.
+
+    When Anthropic is not active (development / OpenAI primary), the message
+    is constructed without ``cache_control`` metadata — other providers
+    silently ignore the extra key, so this is safe to use unconditionally.
+    """
+    content_blocks: list[dict] = []
+    for i, block in enumerate(static_blocks):
+        entry: dict = {"type": "text", "text": block}
+        if _USE_ANTHROPIC_CACHE and cache_after_last and i == len(static_blocks) - 1:
+            entry["cache_control"] = {"type": "ephemeral"}
+        content_blocks.append(entry)
+
+    return SystemMessage(content=content_blocks)
+
+
+def _llm_ainvoke(llm: Any, prompt_text: str, static_parts: list[str]) -> Any:
+    """Invoke the LLM with a prompt, using structured messages for caching.
+
+    When Anthropic is available, the system message is split into cached
+    static content blocks (prompt template, skills descriptions, etc.) and
+    the dynamic portion (user query, results) is sent as a ``HumanMessage``.
+
+    For non-Anthropic providers (or when caching is not needed), a single
+    plain-text string is passed directly — preserving the original behaviour.
+    """
+    if _USE_ANTHROPIC_CACHE and static_parts:
+        system_msg = _build_system_message_with_cache(static_parts)
+        user_msg = HumanMessage(content=prompt_text)
+        return llm.ainvoke([system_msg, user_msg])
+
+    # Standard providers: combine static parts (template + skills) with the
+    # dynamic query, so the LLM receives the full instruction context.
+    full_prompt = (
+        "\n\n---\n\n".join(static_parts + [prompt_text])
+        if static_parts
+        else prompt_text
+    )
+    return llm.ainvoke(full_prompt)
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +271,9 @@ class DeepAgent:
                     skills_desc, query, context, all_results
                 )
                 token_usage["prompt_tokens"] += eval_tokens.get("prompt_tokens", 0)
-                token_usage["completion_tokens"] += eval_tokens.get("completion_tokens", 0)
+                token_usage["completion_tokens"] += eval_tokens.get(
+                    "completion_tokens", 0
+                )
                 token_usage["total_tokens"] += eval_tokens.get("total_tokens", 0)
                 iteration += 1
 
@@ -238,7 +306,9 @@ class DeepAgent:
                     query, context, all_results
                 )
                 token_usage["prompt_tokens"] += synth_tokens.get("prompt_tokens", 0)
-                token_usage["completion_tokens"] += synth_tokens.get("completion_tokens", 0)
+                token_usage["completion_tokens"] += synth_tokens.get(
+                    "completion_tokens", 0
+                )
                 token_usage["total_tokens"] += synth_tokens.get("total_tokens", 0)
                 final_analysis = synthesis_result.get("analysis", str(all_results))
                 final_charts = synthesis_result.get("charts", [])
@@ -261,13 +331,20 @@ class DeepAgent:
 
         Returns (plan_steps, token_usage_dict).
         """
-        prompt = PLAN_PROMPT_PATH.format(
-            skills_description=skills_desc,
-            query=query,
-            additional_context=additional_context,
+        # Static parts: the prompt template (can be cached with Anthropic)
+        static_parts = [PLAN_PROMPT_PATH, skills_desc]
+
+        # Dynamic content: user query + context
+        dynamic_prompt = (
+            f"User request:\n{query}\n\nAdditional context: {additional_context}"
         )
-        response = await self.llm.ainvoke(prompt)
+
+        response = await _llm_ainvoke(self.llm, dynamic_prompt, static_parts)
         content = response.content if hasattr(response, "content") else str(response)
+
+        # The full prompt text is used only for non-Anthropic fallback;
+        # for Anthropic, the static parts are passed separately. We still
+        # rebuild the full text for plan parsing (it's just text).
         plan = self._parse_json_list(content)
         tokens = self._extract_token_usage(response)
         return plan, tokens
@@ -434,13 +511,18 @@ class DeepAgent:
         Returns (evaluation_result_dict, token_usage_dict).
         """
         execution_results_str = yaml.dump(all_results, default_flow_style=False)
-        prompt = EVALUATE_PROMPT_PATH.format(
-            skills_description=skills_desc,
-            query=query,
-            additional_context=additional_context,
-            execution_results=execution_results_str,
+
+        # Static parts: the prompt template + skills description (can be cached)
+        static_parts = [EVALUATE_PROMPT_PATH, skills_desc]
+
+        # Dynamic content: query + context + execution results
+        dynamic_prompt = (
+            f"Original request:\n{query}\n\n"
+            f"Additional context: {additional_context}\n\n"
+            f"Execution results:\n{execution_results_str}"
         )
-        response = await self.llm.ainvoke(prompt)
+
+        response = await _llm_ainvoke(self.llm, dynamic_prompt, static_parts)
         content = response.content if hasattr(response, "content") else str(response)
         result = self._parse_json_obj(content)
         tokens = self._extract_token_usage(response)
@@ -457,12 +539,18 @@ class DeepAgent:
         Returns (synthesis_result_dict, token_usage_dict).
         """
         execution_results_str = yaml.dump(all_results, default_flow_style=False)
-        prompt = SYNTHESIS_PROMPT_PATH.format(
-            query=query,
-            additional_context=additional_context,
-            execution_results=execution_results_str,
+
+        # Static parts: the prompt template (can be cached)
+        static_parts = [SYNTHESIS_PROMPT_PATH]
+
+        # Dynamic content: query + context + execution results
+        dynamic_prompt = (
+            f"Original request:\n{query}\n\n"
+            f"Additional context: {additional_context}\n\n"
+            f"Collected data:\n{execution_results_str}"
         )
-        response = await self.llm.ainvoke(prompt)
+
+        response = await _llm_ainvoke(self.llm, dynamic_prompt, static_parts)
         content = response.content if hasattr(response, "content") else str(response)
         result = self._parse_json_obj(content)
         tokens = self._extract_token_usage(response)

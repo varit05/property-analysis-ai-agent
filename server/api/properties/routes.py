@@ -3,7 +3,7 @@ import json
 import logging
 
 from fastapi import APIRouter, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from server.api.properties.events import get_event_manager
 from server.api.properties.schemas import (
@@ -52,8 +52,6 @@ async def stream_analysis(analysis_id: str):
     # Check the analysis exists
     record = await store.get(analysis_id)
     if not record:
-        from fastapi.responses import JSONResponse
-
         return JSONResponse(
             status_code=404,
             content={"error": f"Analysis {analysis_id} not found"},

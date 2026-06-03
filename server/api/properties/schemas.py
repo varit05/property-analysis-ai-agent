@@ -17,7 +17,9 @@ class TokenUsage(BaseModel):
     """Aggregated token consumption across all LLM calls made by the agent."""
 
     prompt_tokens: int = Field(0, description="Total input / prompt tokens sent")
-    completion_tokens: int = Field(0, description="Total output / completion tokens received")
+    completion_tokens: int = Field(
+        0, description="Total output / completion tokens received"
+    )
     total_tokens: int = Field(0, description="Sum of prompt + completion tokens")
 
 

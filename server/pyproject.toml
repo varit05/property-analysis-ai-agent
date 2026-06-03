@@ -24,6 +24,8 @@ dependencies = [
     "pyyaml>=6.0.3",
     "uvicorn>=0.48.0",
     "mcp>=1.27.1",
+    "redis>=8.0.0",
+    "langchain-community>=0.4.2",
 ]
 
 [project.optional-dependencies]
@@ -62,3 +64,44 @@ line-ending = "auto"
 "api/properties/prompts/*.py" = ["E501"]
 "core/config.py" = ["S104"]
 "core/exceptions.py" = ["N818", "ARG001"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.coverage.run]
+source = ["server"]
+omit = [
+    "server/tests/*",
+    "server/.venv/*",
+    "server/server/data/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "except ImportError",
+]
+
+[tool.mypy]
+python_version = "3.14"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_any_unimported = false
+ignore_missing_imports = true
+no_implicit_optional = true
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "server.tests.*",
+]
+ignore_errors = true

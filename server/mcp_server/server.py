@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 import httpx
 from mcp.server.fastmcp import FastMCP

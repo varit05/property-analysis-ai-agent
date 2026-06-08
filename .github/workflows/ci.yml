@@ -36,19 +36,15 @@ jobs:
           python-version: "3.14"
 
       - name: Install dependencies
-        working-directory: server
         run: make install-server
 
       - name: Lint with ruff
-        working-directory: server
         run: make lint
 
       - name: Check formatting with ruff
-        working-directory: server
         run: make format
 
       - name: Run tests
-        working-directory: server
         run: make test-coverage
         env:
           REDIS_URL: redis://localhost:6379/

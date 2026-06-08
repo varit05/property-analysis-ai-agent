@@ -8,6 +8,7 @@ build/
 .eggs/
 *.egg
 .Python
+server/.coverage
 
 # Virtual environments
 .venv/
@@ -37,3 +38,6 @@ server/data/analyses.json
 # OS
 .DS_Store
 Thumbs.db
+
+client/node_modules
+

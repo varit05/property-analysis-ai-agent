@@ -1,0 +1,365 @@
+/* ── Property Analysis Feature Styles ────────────────────────────── */
+
+.pa-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  text-align: left;
+}
+
+/* ── Analysis Form ───────────────────────────────────────────────── */
+
+.pa-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pa-form textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 0.75rem;
+  font: 15px/1.4 var(--mono, ui-monospace, Consolas, monospace);
+  border: 1px solid var(--border, #e5e4e7);
+  border-radius: 6px;
+  background: var(--code-bg, #f4f3ec);
+  color: var(--text-h, #08060d);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.pa-form textarea:focus {
+  outline: none;
+  border-color: var(--accent, #aa3bff);
+  box-shadow: 0 0 0 2px var(--accent-bg, rgba(170, 59, 255, 0.1));
+}
+
+.pa-form .pa-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.pa-form input[type="text"] {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  font: 15px/1.4 var(--sans, system-ui, sans-serif);
+  border: 1px solid var(--border, #e5e4e7);
+  border-radius: 6px;
+  background: var(--code-bg, #f4f3ec);
+  color: var(--text-h, #08060d);
+}
+
+.pa-form input[type="text"]:focus {
+  outline: none;
+  border-color: var(--accent, #aa3bff);
+  box-shadow: 0 0 0 2px var(--accent-bg, rgba(170, 59, 255, 0.1));
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+
+.pa-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  font: 15px/1 var(--sans, system-ui, sans-serif);
+  font-weight: 500;
+  border: 1px solid var(--border, #e5e4e7);
+  border-radius: 6px;
+  background: var(--bg, #fff);
+  color: var(--text-h, #08060d);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.pa-btn:hover:not(:disabled) {
+  background: var(--code-bg, #f4f3ec);
+  border-color: var(--text, #6b6375);
+}
+
+.pa-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pa-btn-primary {
+  background: var(--accent, #aa3bff);
+  color: #fff;
+  border-color: var(--accent, #aa3bff);
+}
+
+.pa-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+  border-color: var(--accent, #aa3bff);
+}
+
+.pa-btn-accept {
+  background: #16a34a;
+  color: #fff;
+  border-color: #16a34a;
+}
+
+.pa-btn-accept:hover:not(:disabled) {
+  filter: brightness(1.1);
+  border-color: #16a34a;
+}
+
+.pa-btn-reject {
+  background: #dc2626;
+  color: #fff;
+  border-color: #dc2626;
+}
+
+.pa-btn-reject:hover:not(:disabled) {
+  filter: brightness(1.1);
+  border-color: #dc2626;
+}
+
+.pa-btn-reset {
+  background: transparent;
+  color: var(--text, #6b6375);
+  border-color: transparent;
+}
+
+.pa-btn-reset:hover:not(:disabled) {
+  color: var(--text-h, #08060d);
+  background: transparent;
+}
+
+/* ── Status Badge ────────────────────────────────────────────────── */
+
+.pa-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pa-status-running {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.pa-status-submitting {
+  background: #fef9c3;
+  color: #a16207;
+}
+
+.pa-status-pending_review {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.pa-status-accepted {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.pa-status-rejected {
+  background: #fce4ec;
+  color: #b91c1c;
+}
+
+.pa-status-failed {
+  background: #fce4ec;
+  color: #b91c1c;
+}
+
+.pa-status-idle {
+  background: var(--code-bg, #f4f3ec);
+  color: var(--text, #6b6375);
+}
+
+@media (prefers-color-scheme: dark) {
+  .pa-status-running {
+    background: #1e3a5f;
+    color: #93c5fd;
+  }
+  .pa-status-submitting {
+    background: #3e3a1e;
+    color: #fde68a;
+  }
+  .pa-status-pending_review {
+    background: #3e351e;
+    color: #fcd34d;
+  }
+  .pa-status-accepted {
+    background: #14532d;
+    color: #86efac;
+  }
+  .pa-status-rejected {
+    background: #3e1e1e;
+    color: #fca5a5;
+  }
+  .pa-status-failed {
+    background: #3e1e1e;
+    color: #fca5a5;
+  }
+}
+
+/* ── Spinner ─────────────────────────────────────────────────────── */
+
+.pa-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border, #e5e4e7);
+  border-top-color: var(--accent, #aa3bff);
+  border-radius: 50%;
+  animation: pa-spin 0.6s linear infinite;
+}
+
+@keyframes pa-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Trace Timeline ──────────────────────────────────────────────── */
+
+.pa-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-left: 2px solid var(--border, #e5e4e7);
+  margin-left: 0.5rem;
+  padding-left: 1rem;
+}
+
+.pa-timeline-step {
+  position: relative;
+  padding: 0.5rem 0;
+}
+
+.pa-timeline-step::before {
+  content: "";
+  position: absolute;
+  left: -1.15rem;
+  top: 0.85rem;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border, #e5e4e7);
+}
+
+.pa-timeline-step.pa-step-success::before {
+  background: #16a34a;
+}
+
+.pa-timeline-step.pa-step-failed::before {
+  background: #dc2626;
+}
+
+.pa-step-summary {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-h, #08060d);
+  margin-bottom: 0.15rem;
+}
+
+.pa-step-meta {
+  font-size: 12px;
+  color: var(--text, #6b6375);
+}
+
+.pa-step-detail {
+  font-size: 13px;
+  color: var(--text, #6b6375);
+  margin-top: 0.25rem;
+  padding: 0.4rem 0.6rem;
+  background: var(--code-bg, #f4f3ec);
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* ── Section Headers ─────────────────────────────────────────────── */
+
+.pa-section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-h, #08060d);
+  margin: 0;
+}
+
+.pa-section-subtitle {
+  font-size: 14px;
+  color: var(--text, #6b6375);
+  margin: 0.25rem 0 0 0;
+}
+
+/* ── Research Note ───────────────────────────────────────────────── */
+
+.pa-research-note {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-h, #08060d);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  background: var(--code-bg, #f4f3ec);
+  padding: 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border, #e5e4e7);
+}
+
+/* ── Chart View ──────────────────────────────────────────────────── */
+
+.pa-chart-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.pa-chart {
+  flex: 1 1 300px;
+  max-width: 500px;
+}
+
+.pa-chart-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h, #08060d);
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.pa-chart svg {
+  display: block;
+  margin: 0 auto;
+}
+
+/* ── Error Banner ────────────────────────────────────────────────── */
+
+.pa-error {
+  padding: 0.75rem;
+  background: #fce4ec;
+  color: #b91c1c;
+  border: 1px solid #f8b4b4;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+/* ── Token Usage ─────────────────────────────────────────────────── */
+
+.pa-token-usage {
+  font-size: 12px;
+  color: var(--text, #6b6375);
+  text-align: right;
+  padding: 0.25rem 0;
+}
+
+/* ── Review Actions ──────────────────────────────────────────────── */
+
+.pa-review {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 1rem 0;
+}
